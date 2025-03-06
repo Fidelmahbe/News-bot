@@ -27,8 +27,16 @@ const COINTELEGRAPH_RSS_URL = "https://cointelegraph.com/rss";
 function escapeMarkdownV2(text) {
   if (!text) return "";
   return text
-    .replace(/([_*[\](){}~`>#+\-=|.])/g, "\\$1") // Escape các ký tự đặc biệt
+    .replace(/([_*[\](){}~`>#+\-=|.!])/g, "\\$1") // Escape các ký tự đặc biệt
     .replace(/\\/g, "\\\\"); // Escape ký tự \ nếu có
+}
+
+// Hàm escape URL cho MarkdownV2
+function escapeMarkdownV2URL(url) {
+  if (!url) return "";
+  return url
+    .replace(/([()[\]{}~`>#+\-=|.!])/g, "\\$1") // Escape ký tự đặc biệt trong URL
+    .replace(/\\/g, "\\\\");
 }
 
 // Lấy tin tức từ NewsAPI
@@ -197,13 +205,17 @@ async function sendNews() {
   const processed = await processWithAI(article);
 
   // Định dạng tin nhắn với MarkdownV2 hợp lệ
+  const defaultImageUrl = "https://ik.imagekit.io/s0jjvjav7h/2151072976.jpg?updatedAt=1741248488016";
+  const imageUrl = article.image_url || defaultImageUrl;
+  const escapedImageUrl = escapeMarkdownV2URL(imageUrl);
+
   const message = `
 *RadioSignal News Day \\- ${escapeMarkdownV2(updateTime)}*
 *📊*: ${escapeMarkdownV2(processed.title)}
 *Description*: ${escapeMarkdownV2(processed.summary)}
 *Source*: ${escapeMarkdownV2(processed.source)}
 
-[Ảnh minh họa](${article.image_url || "https://ik.imagekit.io/s0jjvjav7h/2151072976.jpg?updatedAt=1741248488016"})`;
+[Ảnh minh họa](${escapedImageUrl})`;
 
   try {
     if (article.image_url) {
