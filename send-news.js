@@ -23,24 +23,6 @@ const COINDESK_RSS_URL = "https://www.coindesk.com/arc/outboundfeeds/rss";
 const CRYPTO_NEWS_RSS_URL = "https://crypto.news/feed/";
 const COINTELEGRAPH_RSS_URL = "https://cointelegraph.com/rss";
 
-// Hàm escape ký tự đặc biệt cho MarkdownV2
-function escapeMarkdownV2(text) {
-  if (!text) return "";
-  return text
-    .replace(/([_*[\](){}~`>#+\-=|.!])/g, "\\$1") // Escape các ký tự đặc biệt
-    .replace(/\\/g, "\\\\"); // Escape ký tự \ nếu có
-}
-
-// Hàm escape URL cho MarkdownV2
-function escapeMarkdownV2URL(url) {
-  if (!url) return "";
-  // Encode URI trước để xử lý ký tự đặc biệt trong query string
-  const encodedUrl = encodeURIComponent(url);
-  return encodedUrl
-    .replace(/([()[\]{}~`>#+\-=|.!])/g, "\\$1") // Escape ký tự đặc biệt
-    .replace(/\\/g, "\\\\");
-}
-
 // Lấy tin tức từ NewsAPI
 async function fetchNewsFromNewsAPI() {
   try {
@@ -178,18 +160,17 @@ async function processWithAI(article) {
     const response = result.response.text();
     const [titleLine, summaryLine, sourceLine] = response.split("\n").map(line => line.replace(/^- /, "").trim());
 
-    // Đảm bảo nội dung hợp lệ và escape ký tự đặc biệt
     return {
-      title: escapeMarkdownV2(titleLine.replace("Tiêu đề: ", "").trim()),
-      summary: escapeMarkdownV2(summaryLine.replace("Tóm tắt: ", "").trim()),
-      source: escapeMarkdownV2(sourceLine.replace("Nguồn: ", "").trim()) || escapeMarkdownV2(article.source_id) || "Nguồn không rõ",
+      title: titleLine.replace("Tiêu đề: ", "").trim(),
+      summary: summaryLine.replace("Tóm tắt: ", "").trim(),
+      source: sourceLine.replace("Nguồn: ", "").trim() || article.source_id || "Nguồn không rõ",
     };
   } catch (error) {
     console.error("Error with Gemini AI:", error.message);
     return {
-      title: escapeMarkdownV2(article.title || "Không có tiêu đề"),
-      summary: escapeMarkdownV2(article.description || "Không có mô tả"),
-      source: escapeMarkdownV2(article.source_id) || "Nguồn không rõ",
+      title: article.title || "Không có tiêu đề",
+      summary: article.description || "Không có mô tả",
+      source: article.source_id || "Nguồn không rõ",
     };
   }
 }
@@ -206,27 +187,26 @@ async function sendNews() {
   const updateTime = new Date().toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
   const processed = await processWithAI(article);
 
-  // Định dạng tin nhắn với MarkdownV2 hợp lệ
+  // Định dạng tin nhắn với HTML
   const defaultImageUrl = "https://ik.imagekit.io/s0jjvjav7h/2151072976.jpg?updatedAt=1741248488016";
   const imageUrl = article.image_url || defaultImageUrl;
-  const escapedImageUrl = escapeMarkdownV2URL(imageUrl);
 
   const message = `
-*RadioSignal News Day \\- ${escapeMarkdownV2(updateTime)}*
-*📊*: ${processed.title}
-*Description*: ${processed.summary}
-*Source*: ${processed.source}
+<b>RadioSignal News Day - ${updateTime}</b>
+<b>📊:</b> ${processed.title}
+<b>Description:</b> ${processed.summary}
+<b>Source:</b> ${processed.source}
 
-[Ảnh minh họa](${escapedImageUrl})`;
+<a href="${imageUrl}">Ảnh minh họa</a>`;
 
   try {
     if (article.image_url) {
       await bot.telegram.sendPhoto(TELEGRAM_CHANNEL, article.image_url, {
         caption: message,
-        parse_mode: "MarkdownV2",
+        parse_mode: "HTML",
       });
     } else {
-      await bot.telegram.sendMessage(TELEGRAM_CHANNEL, message, { parse_mode: "MarkdownV2" });
+      await bot.telegram.sendMessage(TELEGRAM_CHANNEL, message, { parse_mode: "HTML" });
     }
   } catch (error) {
     console.error("Error sending message:", error.message);
