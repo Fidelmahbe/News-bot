@@ -23,6 +23,14 @@ const COINDESK_RSS_URL = "https://www.coindesk.com/arc/outboundfeeds/rss";
 const CRYPTO_NEWS_RSS_URL = "https://crypto.news/feed/";
 const COINTELEGRAPH_RSS_URL = "https://cointelegraph.com/rss";
 
+// Hàm escape ký tự đặc biệt cho MarkdownV2
+function escapeMarkdownV2(text) {
+  if (!text) return "";
+  return text
+    .replace(/([_*[\](){}~`>#+\-=|.])/g, "\\$1") // Escape các ký tự đặc biệt
+    .replace(/\\/g, "\\\\"); // Escape ký tự \ nếu có
+}
+
 // Lấy tin tức từ NewsAPI
 async function fetchNewsFromNewsAPI() {
   try {
@@ -160,7 +168,7 @@ async function processWithAI(article) {
     const response = result.response.text();
     const [titleLine, summaryLine, sourceLine] = response.split("\n").map(line => line.replace(/^- /, "").trim());
 
-    // Đảm bảo Markdown được đóng đúng
+    // Đảm bảo nội dung hợp lệ và escape ký tự đặc biệt
     return {
       title: titleLine.replace("Tiêu đề: ", "").trim(),
       summary: summaryLine.replace("Tóm tắt: ", "").trim(),
@@ -188,12 +196,12 @@ async function sendNews() {
   const updateTime = new Date().toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
   const processed = await processWithAI(article);
 
-  // Định dạng tin nhắn với Markdown hợp lệ
+  // Định dạng tin nhắn với MarkdownV2 hợp lệ
   const message = `
-*RadioSignal News Day - ${updateTime}*
-*📊*: ${processed.title.replace(/\*/g, "\\*")}  // Escape dấu *
-*Description*: ${processed.summary.replace(/\*/g, "\\*")}
-*Source*: ${processed.source.replace(/\*/g, "\\*")}
+*RadioSignal News Day \\- ${escapeMarkdownV2(updateTime)}*
+*📊*: ${escapeMarkdownV2(processed.title)}
+*Description*: ${escapeMarkdownV2(processed.summary)}
+*Source*: ${escapeMarkdownV2(processed.source)}
 
 [Ảnh minh họa](${article.image_url || "https://ik.imagekit.io/s0jjvjav7h/2151072976.jpg?updatedAt=1741248488016"})`;
 
@@ -201,7 +209,7 @@ async function sendNews() {
     if (article.image_url) {
       await bot.telegram.sendPhoto(TELEGRAM_CHANNEL, article.image_url, {
         caption: message,
-        parse_mode: "MarkdownV2", // Sử dụng MarkdownV2 để xử lý ký tự đặc biệt tốt hơn
+        parse_mode: "MarkdownV2",
       });
     } else {
       await bot.telegram.sendMessage(TELEGRAM_CHANNEL, message, { parse_mode: "MarkdownV2" });
