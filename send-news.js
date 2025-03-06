@@ -34,8 +34,10 @@ function escapeMarkdownV2(text) {
 // Hàm escape URL cho MarkdownV2
 function escapeMarkdownV2URL(url) {
   if (!url) return "";
-  return url
-    .replace(/([()[\]{}~`>#+\-=|.!])/g, "\\$1") // Escape ký tự đặc biệt trong URL
+  // Encode URI trước để xử lý ký tự đặc biệt trong query string
+  const encodedUrl = encodeURIComponent(url);
+  return encodedUrl
+    .replace(/([()[\]{}~`>#+\-=|.!])/g, "\\$1") // Escape ký tự đặc biệt
     .replace(/\\/g, "\\\\");
 }
 
@@ -178,16 +180,16 @@ async function processWithAI(article) {
 
     // Đảm bảo nội dung hợp lệ và escape ký tự đặc biệt
     return {
-      title: titleLine.replace("Tiêu đề: ", "").trim(),
-      summary: summaryLine.replace("Tóm tắt: ", "").trim(),
-      source: sourceLine.replace("Nguồn: ", "").trim() || article.source_id || "Nguồn không rõ",
+      title: escapeMarkdownV2(titleLine.replace("Tiêu đề: ", "").trim()),
+      summary: escapeMarkdownV2(summaryLine.replace("Tóm tắt: ", "").trim()),
+      source: escapeMarkdownV2(sourceLine.replace("Nguồn: ", "").trim()) || escapeMarkdownV2(article.source_id) || "Nguồn không rõ",
     };
   } catch (error) {
     console.error("Error with Gemini AI:", error.message);
     return {
-      title: article.title || "Không có tiêu đề",
-      summary: article.description || "Không có mô tả",
-      source: article.source_id || "Nguồn không rõ",
+      title: escapeMarkdownV2(article.title || "Không có tiêu đề"),
+      summary: escapeMarkdownV2(article.description || "Không có mô tả"),
+      source: escapeMarkdownV2(article.source_id) || "Nguồn không rõ",
     };
   }
 }
@@ -211,9 +213,9 @@ async function sendNews() {
 
   const message = `
 *RadioSignal News Day \\- ${escapeMarkdownV2(updateTime)}*
-*📊*: ${escapeMarkdownV2(processed.title)}
-*Description*: ${escapeMarkdownV2(processed.summary)}
-*Source*: ${escapeMarkdownV2(processed.source)}
+*📊*: ${processed.title}
+*Description*: ${processed.summary}
+*Source*: ${processed.source}
 
 [Ảnh minh họa](${escapedImageUrl})`;
 
