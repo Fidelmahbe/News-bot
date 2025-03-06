@@ -17,34 +17,11 @@ const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 // API URLs
-const COINTELEGRAPH_RSS_URL = "https://cointelegraph.com/rss";
 const NEWS_API_URL = `https://newsapi.org/v2/everything?q=cryptocurrency&apiKey=${NEWS_API_KEY}&pageSize=10`;
 const NEWSDATA_API_URL = `https://api.newsdata.io/v2/news?apikey=${NEWSDATA_API_KEY}&q=cryptocurrency&language=en&limit=10`;
 const COINDESK_RSS_URL = "https://www.coindesk.com/arc/outboundfeeds/rss";
 const CRYPTO_NEWS_RSS_URL = "https://crypto.news/feed/";
-
-
-// Lấy tin tức từ Cointelegraph RSS
-async function fetchNewsFromCointelegraph() {
-    try {
-      const response = await axios.get(COINTELEGRAPH_RSS_URL);
-      const xml = response.data;
-      const result = await parseStringPromise(xml);
-      const items = result.rss.channel[0].item || [];
-      return items
-        .map(item => ({
-          title: item.title[0],
-          description: item.description[0],
-          image_url: item["media:thumbnail"]?.[0]?.$.url || null,
-          source_id: "Cointelegraph",
-          url: item.link[0], // Thêm URL từ RSS
-        }))
-        .filter(article => article.description && article.description.length > 50);
-    } catch (error) {
-      console.error("Error fetching Cointelegraph RSS:", error.message);
-      return [];
-    }
-}
+const COINTELEGRAPH_RSS_URL = "https://cointelegraph.com/rss";
 
 // Lấy tin tức từ NewsAPI
 async function fetchNewsFromNewsAPI() {
@@ -128,6 +105,27 @@ async function fetchNewsFromCryptoNews() {
   }
 }
 
+// Lấy tin tức từ Cointelegraph RSS
+async function fetchNewsFromCointelegraph() {
+  try {
+    const response = await axios.get(COINTELEGRAPH_RSS_URL);
+    const xml = response.data;
+    const result = await parseStringPromise(xml);
+    const items = result.rss.channel[0].item || [];
+    return items
+      .map(item => ({
+        title: item.title[0],
+        description: item.description[0],
+        image_url: item["media:thumbnail"]?.[0]?.$.url || null,
+        source_id: "Cointelegraph",
+        url: item.link[0], // Thêm URL từ RSS
+      }))
+      .filter(article => article.description && article.description.length > 50);
+  } catch (error) {
+    console.error("Error fetching Cointelegraph RSS:", error.message);
+    return [];
+  }
+}
 
 // Lấy tin tức với chiến lược fallback và chọn 1 tin hấp dẫn nhất
 async function fetchCryptoNews() {
@@ -202,7 +200,7 @@ async function sendNews() {
 <b>RadioSignal News Day - ${updateTime}</b>
 <b>📊</b> ${processed.title}
 <b>Description:</b> ${processed.summary || article.description || "No description available"}
-<b>Source:</b> <a href="${article.url || imageUrl}">${processed.source || article.source_id || "No source"}</a>`;
+<b>View Detail 👁️: Detail Article</b> <a href="${article.url || imageUrl}">${processed.source || article.source_id || "No source"}</a>`;
 
   try {
     if (article.image_url) {
