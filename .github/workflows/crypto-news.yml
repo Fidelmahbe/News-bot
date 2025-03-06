@@ -2,14 +2,14 @@ name: Crypto News Bot
 
 on:
   schedule:
-    - cron: "0 1,5,9,13 * * *"  # 8h, 12h, 16h, 20h
-    - cron: "0 3,11 * * *"      # 10h, 18h (giờ VN)
-  workflow_dispatch:            #
+    - cron: "0 1,5,9,13 * * *"  # 8h, 12h, 16h, 20h (VN)
+    - cron: "0 3,11 * * *"      # 10h, 18h (VN)
+  workflow_dispatch:
 
 jobs:
   send-news:
     runs-on: ubuntu-latest
-    if: github.event.schedule == '0 1,5,9,13 * * *'
+    if: github.event.schedule == '0 1,5,9,13 * * *' || github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v3
       - name: Set up Node.js
@@ -27,7 +27,7 @@ jobs:
 
   send-trend:
     runs-on: ubuntu-latest
-    if: github.event.schedule == '0 3,11 * * *'
+    if: github.event.schedule == '0 3,11 * * *' || github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v3
       - name: Set up Node.js
