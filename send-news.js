@@ -33,7 +33,8 @@ async function fetchNewsFromNewsAPI() {
         description: article.description || article.content,
         image_url: article.urlToImage,
         source_id: article.source.name,
-        url: article.url, // Thêm URL để link nguồn
+        url: article.url,
+        published_at: article.publishedAt, // Thêm thời gian xuất bản
       }))
       .filter(article => article.description && article.description.length > 50);
   } catch (error) {
@@ -52,7 +53,8 @@ async function fetchNewsFromNewsData() {
         description: article.description,
         image_url: article.image_url,
         source_id: article.source_id,
-        url: article.link, // Thêm URL từ newsdata.io
+        url: article.link,
+        published_at: article.pubDate, // Thêm thời gian xuất bản
       }))
       .filter(article => article.description && article.description.length > 50);
   } catch (error) {
@@ -74,7 +76,8 @@ async function fetchNewsFromCoinDesk() {
         description: item.description[0],
         image_url: item["media:thumbnail"]?.[0]?.$.url || null,
         source_id: "CoinDesk",
-        url: item.link[0], // Thêm URL từ RSS
+        url: item.link[0],
+        published_at: item.pubDate[0], // Thêm thời gian xuất bản
       }))
       .filter(article => article.description && article.description.length > 50);
   } catch (error) {
@@ -96,7 +99,8 @@ async function fetchNewsFromCryptoNews() {
         description: item.description[0],
         image_url: item["media:content"]?.[0]?.$.url || null,
         source_id: "Crypto News",
-        url: item.link[0], // Thêm URL từ RSS
+        url: item.link[0],
+        published_at: item.pubDate[0], // Thêm thời gian xuất bản
       }))
       .filter(article => article.description && article.description.length > 50);
   } catch (error) {
@@ -118,7 +122,8 @@ async function fetchNewsFromCointelegraph() {
         description: item.description[0],
         image_url: item["media:thumbnail"]?.[0]?.$.url || null,
         source_id: "Cointelegraph",
-        url: item.link[0], // Thêm URL từ RSS
+        url: item.link[0],
+        published_at: item.pubDate[0], // Thêm thời gian xuất bản
       }))
       .filter(article => article.description && article.description.length > 50);
   } catch (error) {
@@ -127,22 +132,38 @@ async function fetchNewsFromCointelegraph() {
   }
 }
 
-// Lấy tin tức với chiến lược fallback và chọn 1 tin hấp dẫn nhất
+// Lấy tin tức với chiến lược fallback và chọn 1 tin mới nhất
 async function fetchCryptoNews() {
   let articles = await fetchNewsFromNewsAPI();
-  if (articles.length) return [articles.reduce((max, current) => (current.description.length > max.description.length ? current : max), articles[0])];
+  if (articles.length) {
+    // Sắp xếp theo thời gian xuất bản (mới nhất trước)
+    articles.sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
+    return [articles[0]]; // Lấy tin mới nhất
+  }
 
   articles = await fetchNewsFromNewsData();
-  if (articles.length) return [articles.reduce((max, current) => (current.description.length > max.description.length ? current : max), articles[0])];
+  if (articles.length) {
+    articles.sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
+    return [articles[0]];
+  }
 
   articles = await fetchNewsFromCoinDesk();
-  if (articles.length) return [articles.reduce((max, current) => (current.description.length > max.description.length ? current : max), articles[0])];
+  if (articles.length) {
+    articles.sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
+    return [articles[0]];
+  }
 
   articles = await fetchNewsFromCryptoNews();
-  if (articles.length) return [articles.reduce((max, current) => (current.description.length > max.description.length ? current : max), articles[0])];
+  if (articles.length) {
+    articles.sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
+    return [articles[0]];
+  }
 
   articles = await fetchNewsFromCointelegraph();
-  if (articles.length) return [articles.reduce((max, current) => (current.description.length > max.description.length ? current : max), articles[0])];
+  if (articles.length) {
+    articles.sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
+    return [articles[0]];
+  }
 
   return [];
 }
@@ -188,7 +209,7 @@ async function sendNews() {
     return;
   }
 
-  const article = articles[0]; // Chỉ lấy 1 tin hấp dẫn nhất
+  const article = articles[0]; // Chỉ lấy 1 tin mới nhất
   const updateTime = new Date().toLocaleDateString("en-US", { timeZone: "Asia/Ho_Chi_Minh" }); // Chỉ lấy ngày
   const processed = await processWithAI(article);
 
@@ -200,7 +221,7 @@ async function sendNews() {
 <b>RadioSignal News Day - ${updateTime}</b>
 <b>📊</b> ${processed.title}
 <b>Description:</b> ${processed.summary || article.description || "No description available"}
-<b>View Detail 👁️: Detail Article</b> <a href="${article.url || imageUrl}">${processed.source || article.source_id || "No source"}</a>`;
+<b>View Detail 👁️:</b> <a href="${article.url || imageUrl}">Detail Article</a>`;
 
   try {
     if (article.image_url) {
