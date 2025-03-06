@@ -17,11 +17,34 @@ const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 // API URLs
+const COINTELEGRAPH_RSS_URL = "https://cointelegraph.com/rss";
 const NEWS_API_URL = `https://newsapi.org/v2/everything?q=cryptocurrency&apiKey=${NEWS_API_KEY}&pageSize=10`;
 const NEWSDATA_API_URL = `https://api.newsdata.io/v2/news?apikey=${NEWSDATA_API_KEY}&q=cryptocurrency&language=en&limit=10`;
 const COINDESK_RSS_URL = "https://www.coindesk.com/arc/outboundfeeds/rss";
 const CRYPTO_NEWS_RSS_URL = "https://crypto.news/feed/";
-const COINTELEGRAPH_RSS_URL = "https://cointelegraph.com/rss";
+
+
+// Lấy tin tức từ Cointelegraph RSS
+async function fetchNewsFromCointelegraph() {
+    try {
+      const response = await axios.get(COINTELEGRAPH_RSS_URL);
+      const xml = response.data;
+      const result = await parseStringPromise(xml);
+      const items = result.rss.channel[0].item || [];
+      return items
+        .map(item => ({
+          title: item.title[0],
+          description: item.description[0],
+          image_url: item["media:thumbnail"]?.[0]?.$.url || null,
+          source_id: "Cointelegraph",
+          url: item.link[0], // Thêm URL từ RSS
+        }))
+        .filter(article => article.description && article.description.length > 50);
+    } catch (error) {
+      console.error("Error fetching Cointelegraph RSS:", error.message);
+      return [];
+    }
+}
 
 // Lấy tin tức từ NewsAPI
 async function fetchNewsFromNewsAPI() {
@@ -33,6 +56,7 @@ async function fetchNewsFromNewsAPI() {
         description: article.description || article.content,
         image_url: article.urlToImage,
         source_id: article.source.name,
+        url: article.url, // Thêm URL để link nguồn
       }))
       .filter(article => article.description && article.description.length > 50);
   } catch (error) {
@@ -51,6 +75,7 @@ async function fetchNewsFromNewsData() {
         description: article.description,
         image_url: article.image_url,
         source_id: article.source_id,
+        url: article.link, // Thêm URL từ newsdata.io
       }))
       .filter(article => article.description && article.description.length > 50);
   } catch (error) {
@@ -72,6 +97,7 @@ async function fetchNewsFromCoinDesk() {
         description: item.description[0],
         image_url: item["media:thumbnail"]?.[0]?.$.url || null,
         source_id: "CoinDesk",
+        url: item.link[0], // Thêm URL từ RSS
       }))
       .filter(article => article.description && article.description.length > 50);
   } catch (error) {
@@ -93,6 +119,7 @@ async function fetchNewsFromCryptoNews() {
         description: item.description[0],
         image_url: item["media:content"]?.[0]?.$.url || null,
         source_id: "Crypto News",
+        url: item.link[0], // Thêm URL từ RSS
       }))
       .filter(article => article.description && article.description.length > 50);
   } catch (error) {
@@ -101,26 +128,6 @@ async function fetchNewsFromCryptoNews() {
   }
 }
 
-// Lấy tin tức từ Cointelegraph RSS
-async function fetchNewsFromCointelegraph() {
-  try {
-    const response = await axios.get(COINTELEGRAPH_RSS_URL);
-    const xml = response.data;
-    const result = await parseStringPromise(xml);
-    const items = result.rss.channel[0].item || [];
-    return items
-      .map(item => ({
-        title: item.title[0],
-        description: item.description[0],
-        image_url: item["media:thumbnail"]?.[0]?.$.url || null,
-        source_id: "Cointelegraph",
-      }))
-      .filter(article => article.description && article.description.length > 50);
-  } catch (error) {
-    console.error("Error fetching Cointelegraph RSS:", error.message);
-    return [];
-  }
-}
 
 // Lấy tin tức với chiến lược fallback và chọn 1 tin hấp dẫn nhất
 async function fetchCryptoNews() {
@@ -142,17 +149,17 @@ async function fetchCryptoNews() {
   return [];
 }
 
-// Sử dụng Gemini API để tóm tắt và định dạng
+// Sử dụng Gemini API để tóm tắt và định dạng bằng tiếng Anh
 async function processWithAI(article) {
   const prompt = `
-  Tóm tắt bài tin tức sau một cách ngắn gọn, hấp dẫn và tự nhiên bằng tiếng Việt:
-  Tiêu đề: ${article.title || "Không có tiêu đề"}
-  Mô tả: ${article.description || "Không có mô tả"}
+  Summarize the following news article in a concise, engaging, and natural way in English:
+  Title: ${article.title || "No title"}
+  Description: ${article.description || "No description"}
 
-  Định dạng đầu ra:
-  - Tiêu đề: [Tiêu đề gốc]
-  - Tóm tắt: [Tóm tắt ngắn gọn, tối đa 2 câu, nhấn mạnh điểm nổi bật]
-  - Nguồn: [source_id]
+  Output format:
+  - Title: [Original title]
+  - Summary: [Concise summary, max 2 sentences, highlighting key points]
+  - Source: [source_id]
   `;
 
   try {
@@ -161,16 +168,16 @@ async function processWithAI(article) {
     const [titleLine, summaryLine, sourceLine] = response.split("\n").map(line => line.replace(/^- /, "").trim());
 
     return {
-      title: titleLine.replace("Tiêu đề: ", "").trim(),
-      summary: summaryLine.replace("Tóm tắt: ", "").trim(),
-      source: sourceLine.replace("Nguồn: ", "").trim() || article.source_id || "Nguồn không rõ",
+      title: titleLine.replace("Title: ", "").trim(),
+      summary: summaryLine.replace("Summary: ", "").trim(),
+      source: sourceLine.replace("Source: ", "").trim() || article.source_id || "No source",
     };
   } catch (error) {
     console.error("Error with Gemini AI:", error.message);
     return {
-      title: article.title || "Không có tiêu đề",
-      summary: article.description || "Không có mô tả",
-      source: article.source_id || "Nguồn không rõ",
+      title: article.title || "No title",
+      summary: article.description || "No description",
+      source: article.source_id || "No source",
     };
   }
 }
@@ -179,12 +186,12 @@ async function processWithAI(article) {
 async function sendNews() {
   const articles = await fetchCryptoNews();
   if (!articles.length) {
-    await bot.telegram.sendMessage(TELEGRAM_CHANNEL, "Không thể lấy tin tức từ bất kỳ nguồn nào.");
+    await bot.telegram.sendMessage(TELEGRAM_CHANNEL, "Cannot fetch news from any source.");
     return;
   }
 
   const article = articles[0]; // Chỉ lấy 1 tin hấp dẫn nhất
-  const updateTime = new Date().toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
+  const updateTime = new Date().toLocaleDateString("en-US", { timeZone: "Asia/Ho_Chi_Minh" }); // Chỉ lấy ngày
   const processed = await processWithAI(article);
 
   // Định dạng tin nhắn với HTML
@@ -193,11 +200,9 @@ async function sendNews() {
 
   const message = `
 <b>RadioSignal News Day - ${updateTime}</b>
-<b>📊:</b> ${processed.title}
-<b>Description:</b> ${processed.summary}
-<b>Source:</b> ${processed.source}
-
-<a href="${imageUrl}">Ảnh minh họa</a>`;
+<b>📊</b> ${processed.title}
+<b>Description:</b> ${processed.summary || article.description || "No description available"}
+<b>Source:</b> <a href="${article.url || imageUrl}">${processed.source || article.source_id || "No source"}</a>`;
 
   try {
     if (article.image_url) {
@@ -210,11 +215,11 @@ async function sendNews() {
     }
   } catch (error) {
     console.error("Error sending message:", error.message);
-    await bot.telegram.sendMessage(TELEGRAM_CHANNEL, "Lỗi khi gửi tin tức. Vui lòng kiểm tra log.");
+    await bot.telegram.sendMessage(TELEGRAM_CHANNEL, "Error sending news. Please check logs.");
   }
 }
 
 // Chạy chức năng
 const task = process.argv[2];
 if (task === "news") sendNews();
-else console.log("Vui lòng chọn 'news'");
+else console.log("Please select 'news'");
