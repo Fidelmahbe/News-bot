@@ -17,7 +17,7 @@ const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 // API URLs
-const NEWS_API_URL = `https://newsapi.org/v2/everything?q=cryptocurrency&apiKey=${NEWS_API_KEY}&pageSize=10`; // Lấy nhiều hơn để chọn lọc
+const NEWS_API_URL = `https://newsapi.org/v2/everything?q=cryptocurrency&apiKey=${NEWS_API_KEY}&pageSize=10`;
 const NEWSDATA_API_URL = `https://api.newsdata.io/v2/news?apikey=${NEWSDATA_API_KEY}&q=cryptocurrency&language=en&limit=10`;
 const COINDESK_RSS_URL = "https://www.coindesk.com/arc/outboundfeeds/rss";
 const CRYPTO_NEWS_RSS_URL = "https://crypto.news/feed/";
@@ -34,7 +34,7 @@ async function fetchNewsFromNewsAPI() {
         image_url: article.urlToImage,
         source_id: article.source.name,
       }))
-      .filter(article => article.description && article.description.length > 50); // Lọc tin hấp dẫn
+      .filter(article => article.description && article.description.length > 50);
   } catch (error) {
     console.error("Error fetching NewsAPI:", error.message);
     return [];
@@ -160,10 +160,11 @@ async function processWithAI(article) {
     const response = result.response.text();
     const [titleLine, summaryLine, sourceLine] = response.split("\n").map(line => line.replace(/^- /, "").trim());
 
+    // Đảm bảo Markdown được đóng đúng
     return {
-      title: titleLine.replace("Tiêu đề: ", ""),
-      summary: summaryLine.replace("Tóm tắt: ", ""),
-      source: sourceLine.replace("Nguồn: ", "") || article.source_id || "Nguồn không rõ",
+      title: titleLine.replace("Tiêu đề: ", "").trim(),
+      summary: summaryLine.replace("Tóm tắt: ", "").trim(),
+      source: sourceLine.replace("Nguồn: ", "").trim() || article.source_id || "Nguồn không rõ",
     };
   } catch (error) {
     console.error("Error with Gemini AI:", error.message);
@@ -186,21 +187,28 @@ async function sendNews() {
   const article = articles[0]; // Chỉ lấy 1 tin hấp dẫn nhất
   const updateTime = new Date().toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
   const processed = await processWithAI(article);
+
+  // Định dạng tin nhắn với Markdown hợp lệ
   const message = `
-*Tin tức Crypto - ${updateTime}*
-*Tiêu đề*: ${processed.title}
-*Tóm tắt*: ${processed.summary}
-*Nguồn*: ${processed.source}
+*RadioSignal News Day - ${updateTime}*
+*📊*: ${processed.title.replace(/\*/g, "\\*")}  // Escape dấu *
+*Description*: ${processed.summary.replace(/\*/g, "\\*")}
+*Source*: ${processed.source.replace(/\*/g, "\\*")}
 
-[Ảnh minh họa](${article.image_url || "https://via.placeholder.com/150"})`;
+[Ảnh minh họa](${article.image_url || "https://ik.imagekit.io/s0jjvjav7h/2151072976.jpg?updatedAt=1741248488016"})`;
 
-  if (article.image_url) {
-    await bot.telegram.sendPhoto(TELEGRAM_CHANNEL, article.image_url, {
-      caption: message,
-      parse_mode: "Markdown",
-    });
-  } else {
-    await bot.telegram.sendMessage(TELEGRAM_CHANNEL, message, { parse_mode: "Markdown" });
+  try {
+    if (article.image_url) {
+      await bot.telegram.sendPhoto(TELEGRAM_CHANNEL, article.image_url, {
+        caption: message,
+        parse_mode: "MarkdownV2", // Sử dụng MarkdownV2 để xử lý ký tự đặc biệt tốt hơn
+      });
+    } else {
+      await bot.telegram.sendMessage(TELEGRAM_CHANNEL, message, { parse_mode: "MarkdownV2" });
+    }
+  } catch (error) {
+    console.error("Error sending message:", error.message);
+    await bot.telegram.sendMessage(TELEGRAM_CHANNEL, "Lỗi khi gửi tin tức. Vui lòng kiểm tra log.");
   }
 }
 
