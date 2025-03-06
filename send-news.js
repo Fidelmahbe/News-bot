@@ -23,6 +23,14 @@ const COINDESK_RSS_URL = "https://www.coindesk.com/arc/outboundfeeds/rss";
 const CRYPTO_NEWS_RSS_URL = "https://crypto.news/feed/";
 const COINTELEGRAPH_RSS_URL = "https://cointelegraph.com/rss";
 
+// Hàm kiểm tra và làm sạch URL
+function cleanUrl(url) {
+  if (!url) return null;
+  // Loại bỏ URL liên quan đến consent.yahoo.com
+  if (url.includes("consent.yahoo.com")) return null;
+  return url;
+}
+
 // Lấy tin tức từ NewsAPI
 async function fetchNewsFromNewsAPI() {
   try {
@@ -33,8 +41,8 @@ async function fetchNewsFromNewsAPI() {
         description: article.description || article.content,
         image_url: article.urlToImage,
         source_id: article.source.name,
-        url: article.url,
-        published_at: article.publishedAt, // Thêm thời gian xuất bản
+        url: cleanUrl(article.url), // Làm sạch URL
+        published_at: article.publishedAt,
       }))
       .filter(article => article.description && article.description.length > 50);
   } catch (error) {
@@ -53,8 +61,8 @@ async function fetchNewsFromNewsData() {
         description: article.description,
         image_url: article.image_url,
         source_id: article.source_id,
-        url: article.link,
-        published_at: article.pubDate, // Thêm thời gian xuất bản
+        url: cleanUrl(article.link),
+        published_at: article.pubDate,
       }))
       .filter(article => article.description && article.description.length > 50);
   } catch (error) {
@@ -76,8 +84,8 @@ async function fetchNewsFromCoinDesk() {
         description: item.description[0],
         image_url: item["media:thumbnail"]?.[0]?.$.url || null,
         source_id: "CoinDesk",
-        url: item.link[0],
-        published_at: item.pubDate[0], // Thêm thời gian xuất bản
+        url: cleanUrl(item.link[0]),
+        published_at: item.pubDate[0],
       }))
       .filter(article => article.description && article.description.length > 50);
   } catch (error) {
@@ -99,8 +107,8 @@ async function fetchNewsFromCryptoNews() {
         description: item.description[0],
         image_url: item["media:content"]?.[0]?.$.url || null,
         source_id: "Crypto News",
-        url: item.link[0],
-        published_at: item.pubDate[0], // Thêm thời gian xuất bản
+        url: cleanUrl(item.link[0]),
+        published_at: item.pubDate[0],
       }))
       .filter(article => article.description && article.description.length > 50);
   } catch (error) {
@@ -122,8 +130,8 @@ async function fetchNewsFromCointelegraph() {
         description: item.description[0],
         image_url: item["media:thumbnail"]?.[0]?.$.url || null,
         source_id: "Cointelegraph",
-        url: item.link[0],
-        published_at: item.pubDate[0], // Thêm thời gian xuất bản
+        url: cleanUrl(item.link[0]),
+        published_at: item.pubDate[0],
       }))
       .filter(article => article.description && article.description.length > 50);
   } catch (error) {
@@ -136,7 +144,6 @@ async function fetchNewsFromCointelegraph() {
 async function fetchCryptoNews() {
   let articles = await fetchNewsFromNewsAPI();
   if (articles.length) {
-    // Sắp xếp theo thời gian xuất bản (mới nhất trước)
     articles.sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
     return [articles[0]]; // Lấy tin mới nhất
   }
